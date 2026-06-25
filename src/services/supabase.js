@@ -5,6 +5,20 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
+function normalizeRoute(route) {
+  if (!route) return route;
+  const normalizedColor = route.color || route.hold_color || route.tag_color || null;
+  return {
+    ...route,
+    wall_section: route.wall_section || route.wall || '',
+    pin_x: route.pin_x != null ? route.pin_x : route.x != null ? route.x * 100 : null,
+    pin_y: route.pin_y != null ? route.pin_y : route.y != null ? route.y * 100 : null,
+    color: normalizedColor,
+    is_active: route.is_active != null ? route.is_active : route.active != null ? route.active : null,
+    name: route.name || route.description || route.wall || '',
+  };
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 /**
@@ -47,21 +61,28 @@ export const getActiveRoutes = () =>
   supabase
     .from('routes')
     .select('*')
-    .eq('is_active', true)
-    .order('set_date', { ascending: false });
+    .eq('active', true)
+    .then(result => ({
+      ...result,
+      data: result.data?.map(normalizeRoute) ?? null,
+    }));
 
 export const getRoute = (routeId) =>
   supabase
     .from('routes')
     .select(`
       *,
-      sends (id, user_id, send_type, attempts, notes, date,
+      sends (id, user_id, attempts,
         profiles (id, username, avatar_url)),
       clips (id, user_id, video_url, thumbnail_url, caption, created_at,
         profiles (id, username, avatar_url))
     `)
     .eq('id', routeId)
-    .single();
+    .single()
+    .then(result => ({
+      ...result,
+      data: normalizeRoute(result.data),
+    }));
 
 export const createRoute = (route) =>
   supabase.from('routes').insert(route).select().single();
@@ -71,22 +92,18 @@ export const archiveRoute = (routeId) =>
 
 // ─── Sends ────────────────────────────────────────────────────────────────────
 // Table: sends (id uuid PK, user_id uuid → profiles.id, route_id uuid → routes.id,
-//               send_type text CHECK ('flash','send','attempt'), attempts int,
-//               notes text, date date, created_at timestamptz)
+//               attempts int, created_at timestamptz)
 
-export const logSend = ({ userId, routeId, sendType, attempts = 1, notes = '', date }) =>
-  supabase
+export const logSend = ({ userId, routeId, attempts = 1 }) => {
+  const normalizedAttempts = Number(attempts) || 1;
+  return supabase
     .from('sends')
     .insert({
       user_id: userId,
       route_id: routeId,
-      send_type: sendType,       // 'flash' | 'send' | 'attempt'
-      attempts,
-      notes,
-      date: date ?? new Date().toISOString().split('T')[0],
-    })
-    .select()
-    .single();
+      attempts: normalizedAttempts,
+    });
+};
 
 export const deleteSend = (sendId) =>
   supabase.from('sends').delete().eq('id', sendId);
@@ -99,7 +116,7 @@ export const getUserSends = (userId) =>
       routes (id, name, grade, color, wall_section, is_active)
     `)
     .eq('user_id', userId)
-    .order('date', { ascending: false });
+    .order('created_at', { ascending: false });
 
 export const getRecentSends = (limit = 30) =>
   supabase
@@ -109,7 +126,6 @@ export const getRecentSends = (limit = 30) =>
       profiles (id, username, avatar_url),
       routes (id, name, grade, color, wall_section)
     `)
-    .in('send_type', ['flash', 'send'])
     .order('created_at', { ascending: false })
     .limit(limit);
 

@@ -61,9 +61,7 @@ function SendCard({ send }) {
             <span className="text-muted text-xs" style={{ flexShrink: 0 }}>{route.wall_section}</span>
           )}
         </div>
-        {send.notes && (
-          <p className="text-sm text-muted" style={{ marginTop: '0.35rem', lineHeight: 1.4 }}>{send.notes}</p>
-        )}
+        {/* no notes field on sends table */}
       </div>
     </div>
   );
@@ -197,7 +195,7 @@ export default function Home() {
           {[
             { id: 'sends',  label: 'Sends' },
             { id: 'routes', label: 'On the wall' },
-            { id: 'clips',  label: 'Clips' },
+            { id: 'clips',  label: 'Leaderboard' },
           ].map(t => (
             <button
               key={t.id}
@@ -239,17 +237,17 @@ export default function Home() {
           </section>
         )}
 
-        {/* ── Clips tab ── */}
+        {/* ── Leaderboard tab ── */}
         {tab === 'clips' && (
           <section>
-            <SectionHead title="Latest clips" />
+            <SectionHead title="Leaderboard" />
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
               {clips === null
                 ? Array.from({ length: 6 }).map((_, i) => (
                     <div key={i} className="skeleton" style={{ aspectRatio: '9/16', borderRadius: 'var(--radius)' }} />
                   ))
                 : clips.length === 0
-                  ? <p className="text-muted text-sm">No clips yet.</p>
+                  ? <p className="text-muted text-sm">No leaderboard entries yet.</p>
                   : clips.map(c => <ClipCard key={c.id} clip={c} />)
               }
             </div>

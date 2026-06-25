@@ -3,9 +3,10 @@ import { BrowserRouter, Routes, Route, NavLink, Navigate, useNavigate, useLocati
 import { supabase, signInWithGoogle, signOut, getProfile, upsertProfile } from './services/supabase';
 
 import Home from './pages/Home';
+import GymMap from './pages/GymMap';
+import Profile from './pages/Profile';
 // import RoutesPage from './pages/Routes';
 // import Clips      from './pages/Clips';
-// import Profile    from './pages/Profile';
 
 // ─── Auth context ─────────────────────────────────────────────────────────────
 const AuthContext = createContext(null);
@@ -31,13 +32,23 @@ function AuthProvider({ children }) {
   }, []);
 
   const loadProfile = async (user) => {
-    await upsertProfile({
-      id: user.id,
-      username: user.user_metadata?.full_name ?? user.email.split('@')[0],
-      avatar_url: user.user_metadata?.avatar_url ?? null,
-    });
     const { data } = await getProfile(user.id);
-    setProfile(data);
+    const defaultUsername = user.user_metadata?.full_name ?? user.email.split('@')[0];
+    const defaultAvatar = user.user_metadata?.avatar_url ?? null;
+    const defaultDisplayName = user.user_metadata?.full_name ?? defaultUsername;
+
+    if (!data) {
+      await upsertProfile({
+        id: user.id,
+        username: defaultUsername,
+        display_name: defaultDisplayName,
+        avatar_url: defaultAvatar,
+      });
+      const { data: newProfile } = await getProfile(user.id);
+      setProfile(newProfile);
+    } else {
+      setProfile(data);
+    }
   };
 
   const login  = () => signInWithGoogle();
@@ -102,9 +113,9 @@ function BottomNav() {
   const at = (path) => location.pathname === path;
 
   const tabs = [
-    { to: '/',        label: 'Home',    Icon: IconHome },
-    { to: '/routes',  label: 'Routes',  Icon: IconRoutes },
-    { to: '/clips',   label: 'Clips',   Icon: IconClips },
+    { to: '/',        label: 'Home',      Icon: IconHome },
+    { to: '/routes',  label: 'Routes',    Icon: IconRoutes },
+    { to: '/clips',   label: 'Leaderboard',   Icon: IconClips },
     { to: session ? `/profile/${profile?.id}` : '/profile', label: 'Me', Icon: IconProfile },
   ];
 
@@ -134,7 +145,7 @@ function TopNav() {
         <NavLink to="/" className="top-nav__logo">⬡ Crux</NavLink>
         <div className="top-nav__links">
           {['/', '/routes', '/clips'].map((path, i) => {
-            const labels = ['Home', 'Routes', 'Clips'];
+            const labels = ['Home', 'Routes', 'Leaderboard'];
             return (
               <NavLink key={path} to={path} end={path === '/'} className={({ isActive }) => `top-nav__link${isActive ? ' active' : ''}`}>
                 {labels[i]}
@@ -193,9 +204,9 @@ export default function App() {
           <Routes>
             <Route path="/"              element={<Home />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
-            {/* <Route path="/routes"        element={<RoutesPage />} /> */}
-            {/* <Route path="/clips"         element={<Clips />} /> */}
-            {/* <Route path="/profile/:id"   element={<Profile />} /> */}
+            <Route path="/routes"        element={<GymMap />} />
+          <Route path="/profile/:id"   element={<Profile />} />
+          {/* <Route path="/clips"         element={<Clips />} /> */}
           </Routes>
         </main>
 
