@@ -22,8 +22,8 @@ const HOLD_COLORS = {
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
-const CLUSTER_ZOOM_THRESHOLD = 2.5; // below this, show clusters; above, show individual pins
-const LABEL_ZOOM_THRESHOLD = 2.5; // labels disappear when zoomed in beyond this
+const CLUSTER_ZOOM_THRESHOLD = 2; // below this, show clusters; above, show individual pins
+const LABEL_ZOOM_THRESHOLD = 2; // labels disappear when zoomed in beyond this
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -319,12 +319,12 @@ export default function MapCanvas({ routes = [], onSectionSelect, onRouteSelect 
           <>
             {[
               { key: 'frontslab', label: 'Front slab', x: 93, y: 50 },
-              { key: 'wave',      label: 'Wave wall', x: 70, y: 75 },
-              { key: 'accordion', label: 'Accordion wall', x: 35, y: 75 },
+              { key: 'wave',      label: 'Wave wall', x: 70, y: 60 },
+              { key: 'accordion', label: 'Accordion wall', x: 35, y: 60 },
               { key: 'bulge',     label: 'The bulge', x: 6,  y: 50 },
               { key: 'roof',      label: 'Super roof', x: 60, y: 45 },
               { key: 'staircase', label: 'Staircase wall', x: 30, y: 45 },
-              { key: 'backslab',  label: 'Back slab', x: 50, y: 18 },
+              { key: 'backslab',  label: 'Back slab', x: 50, y: 21 },
             ].map(s => (
               <MapLabel
                 key={s.key}
