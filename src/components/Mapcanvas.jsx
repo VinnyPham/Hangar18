@@ -319,9 +319,9 @@ export default function MapCanvas({ routes = [], onSectionSelect, onRouteSelect 
           <>
             {[
               { key: 'frontslab', label: 'Front slab', x: 93, y: 50 },
-              { key: 'wave',      label: 'Wave wall', x: 70, y: 70 },
-              { key: 'accordion', label: 'Accordion wall', x: 35, y: 70 },
-              { key: 'bulge',     label: 'The bulge', x: 6,  y: 50 },
+              { key: 'wave',      label: 'Wave wall', x: 70, y: 71 },
+              { key: 'accordion', label: 'Accordion wall', x: 35, y: 72 },
+              { key: 'bulge',     label: 'Bulge', x: 6,  y: 50 },
               { key: 'roof',      label: 'Super roof', x: 60, y: 45 },
               { key: 'staircase', label: 'Staircase wall', x: 30, y: 45 },
               { key: 'backslab',  label: 'Back slab', x: 50, y: 21 },
