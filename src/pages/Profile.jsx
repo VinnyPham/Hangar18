@@ -24,21 +24,32 @@ function normalizeGrade(grade) {
   return match ? match[1] : null;
 }
 
+function dedupeSendsByRoute(sends = []) {
+  const seen = new Set();
+  return sends.filter((entry) => {
+    const routeKey = entry.route_id ?? entry.routes?.id;
+    if (!routeKey || seen.has(routeKey)) return false;
+    seen.add(routeKey);
+    return true;
+  });
+}
+
 // ── Tiny stat card ─────────────────────────────────────────────────────────
 function StatCard({ label, value, accent }) {
   return (
     <div style={{
       flex: 1,
-      background: "#1A1A2E",
+      background: "#1A1A1A",
       borderRadius: 14,
       padding: "14px 10px",
       textAlign: "center",
-      borderTop: `3px solid ${accent ?? "#E94560"}`,
+      border: "1px solid #2A2A2A",
+      borderTop: `3px solid ${accent ?? "#FFD600"}`,
     }}>
-      <div style={{ fontSize: 22, fontWeight: 800, color: "#F0F0F0", letterSpacing: -0.5 }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: "#F8F7F4", letterSpacing: -0.5 }}>
         {value ?? "—"}
       </div>
-      <div style={{ fontSize: 11, color: "#888", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>
+      <div style={{ fontSize: 11, color: "#9CA3AF", marginTop: 3, textTransform: "uppercase", letterSpacing: 0.8 }}>
         {label}
       </div>
     </div>
@@ -47,21 +58,21 @@ function StatCard({ label, value, accent }) {
 
 // ── Grade pill ─────────────────────────────────────────────────────────────
 function GradePill({ grade, count }) {
-  const color = GRADE_COLORS[grade] ?? "#aaa";
+  const color = GRADE_COLORS[grade] ?? "#9CA3AF";
   return (
     <div style={{
       display: "flex", alignItems: "center", gap: 8,
-      background: "#1A1A2E", borderRadius: 10, padding: "9px 13px",
+      background: "#1A1A1A", borderRadius: 12, padding: "9px 13px",
+      border: "1px solid #2A2A2A",
     }}>
       <div style={{
         width: 10, height: 10, borderRadius: "50%",
         background: color, flexShrink: 0,
-        boxShadow: `0 0 6px ${color}99`,
       }} />
-      <span style={{ fontWeight: 700, color: "#F0F0F0", fontSize: 14 }}>{grade}</span>
+      <span style={{ fontWeight: 700, color: "#F8F7F4", fontSize: 14 }}>{grade}</span>
       <div style={{
         flex: 1, height: 4, borderRadius: 2,
-        background: "#2A2A3E", overflow: "hidden",
+        background: "#2A2A2A", overflow: "hidden",
       }}>
         <div style={{
           width: `${Math.min(count * 10, 100)}%`,
@@ -69,7 +80,7 @@ function GradePill({ grade, count }) {
           borderRadius: 2, transition: "width 0.6s ease",
         }} />
       </div>
-      <span style={{ color: "#888", fontSize: 12, minWidth: 20, textAlign: "right" }}>
+      <span style={{ color: "#9CA3AF", fontSize: 12, minWidth: 20, textAlign: "right" }}>
         {count}
       </span>
     </div>
@@ -77,33 +88,166 @@ function GradePill({ grade, count }) {
 }
 
 // ── Log entry row ──────────────────────────────────────────────────────────
-function LogRow({ entry }) {
+function LogRow({
+  entry, isEditing, editAttempts, onStartEdit, onCancelEdit, onChangeAttempts, onSaveEdit, saving, error,
+  isDeleting, onRequestDelete, onCancelDelete, onConfirmDelete, deleting,
+}) {
   const grade = normalizeGrade(entry.grade ?? entry.routes?.grade);
   const color = GRADE_COLORS[grade] ?? "#aaa";
   const date = new Date(entry.created_at).toLocaleDateString("en-US", {
     month: "short", day: "numeric",
   });
+
   return (
     <div style={{
-      display: "flex", alignItems: "center", gap: 12,
-      padding: "12px 0", borderBottom: "1px solid #1A1A2E",
+      display: "flex", flexDirection: "column", gap: 10,
+      padding: "12px 0", borderBottom: "1px solid #2A2A2A",
     }}>
-      <div style={{
-        width: 36, height: 36, borderRadius: 10,
-        background: `${color}22`, border: `1.5px solid ${color}`,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontWeight: 800, fontSize: 11, color,
-      }}>
-        {grade ?? "?"}
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontWeight: 600, color: "#F0F0F0", fontSize: 14 }}>
-          {grade ?? "Unknown grade"}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 10,
+          background: `${color}22`, border: `1.5px solid ${color}`,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontWeight: 800, fontSize: 11, color,
+        }}>
+          {grade ?? "?"}
         </div>
-        <div style={{ fontSize: 12, color: "#666", marginTop: 2 }}>
-          {entry.attempts} {entry.attempts === 1 ? "try" : "tries"} · {date}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: 600, color: "#F8F7F4", fontSize: 14 }}>
+            {grade ?? "Unknown grade"}
+          </div>
+          <div style={{ fontSize: 12, color: "#9CA3AF", marginTop: 2 }}>
+            {isEditing
+              ? "Editing send…"
+              : isDeleting
+                ? "Delete this send?"
+                : `${entry.attempts} ${entry.attempts === 1 ? "try" : "tries"} · ${date}`}
+          </div>
         </div>
+        {isDeleting ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => onConfirmDelete(entry.id)}
+              disabled={deleting}
+              style={{
+                border: "1px solid #2A2A2A",
+                borderRadius: 10,
+                padding: "8px 12px",
+                fontSize: 12,
+                color: "#141414",
+                background: "#FFD600",
+                cursor: "pointer",
+              }}
+            >
+              {deleting ? "Deleting…" : "Confirm"}
+            </button>
+            <button
+              onClick={onCancelDelete}
+              disabled={deleting}
+              style={{
+                border: "1px solid #2A2A2A",
+                borderRadius: 10,
+                padding: "8px 12px",
+                fontSize: 12,
+                color: "#9CA3AF",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        ) : !isEditing ? (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={onStartEdit}
+              style={{
+                border: "1px solid #2A2A2A",
+                borderRadius: 12,
+                padding: "8px 12px",
+                fontSize: 12,
+                color: "#F8F7F4",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onRequestDelete(entry.id)}
+              style={{
+                border: "1px solid #2A2A2A",
+                borderRadius: 12,
+                padding: "8px 12px",
+                fontSize: 12,
+                color: "#F8F7F4",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={() => onChangeAttempts(Math.max(1, Number(editAttempts) - 1))}
+              disabled={saving}
+              style={{
+                width: 32, height: 32, borderRadius: 10,
+                border: "1px solid #2A2A2A", background: "transparent",
+                color: "#F8F7F4", cursor: "pointer",
+              }}
+            >
+              −
+            </button>
+            <input
+              value={editAttempts}
+              onChange={(e) => onChangeAttempts(Number(e.target.value) || 1)}
+              style={{
+                width: 48, textAlign: "center",
+                borderRadius: 10, border: "1px solid #2A2A2A",
+                background: "#141414", color: "#F8F7F4", padding: "8px 6px",
+              }}
+            />
+            <button
+              onClick={() => onSaveEdit(entry.id)}
+              disabled={saving}
+              style={{
+                border: "1px solid #2A2A2A",
+                borderRadius: 10,
+                padding: "8px 12px",
+                fontSize: 12,
+                color: "#141414",
+                background: "#FFD600",
+                cursor: "pointer",
+              }}
+            >
+              {saving ? "Saving…" : "Save"}
+            </button>
+            <button
+              onClick={onCancelEdit}
+              disabled={saving}
+              style={{
+                border: "1px solid #2A2A2A",
+                borderRadius: 10,
+                padding: "8px 12px",
+                fontSize: 12,
+                color: "#9CA3AF",
+                background: "transparent",
+                cursor: "pointer",
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
+      {error && (
+        <div style={{ color: "#F97316", fontSize: 12, marginLeft: 48 }}>
+          {error}
+        </div>
+      )}
     </div>
   );
 }
@@ -117,6 +261,13 @@ export default function Profile() {
   const [signingIn, setSigningIn] = useState(false);
   const [statsError, setStatsError] = useState(null);
   const [activeTab, setActiveTab] = useState("stats"); // stats | log
+
+  const [editingSendId, setEditingSendId] = useState(null);
+  const [editAttempts, setEditAttempts] = useState(1);
+  const [sendSaving, setSendSaving] = useState(false);
+  const [sendError, setSendError] = useState(null);
+  const [deletingSendId, setDeletingSendId] = useState(null); // id pending confirmation
+  const [sendDeleting, setSendDeleting] = useState(false);
 
   // ── Edit state ───────────────────────────────────────────────────────────
   const [editing, setEditing] = useState(false);
@@ -181,7 +332,8 @@ export default function Profile() {
     } else {
       setStatsError(null);
     }
-    setLogs((sends ?? []).map(entry => ({
+    const dedupedSends = dedupeSendsByRoute(sends ?? []);
+    setLogs(dedupedSends.map(entry => ({
       ...entry,
       route_name: entry.routes?.name ?? "Unnamed route",
       grade: normalizeGrade(entry.routes?.grade ?? entry.grade),
@@ -219,6 +371,101 @@ export default function Profile() {
     setDraftAvatarFile(null);
     setDraftAvatarPreview(null);
     setSaveError(null);
+  };
+
+  const beginEditSend = (entry) => {
+    setEditingSendId(entry.id);
+    setEditAttempts(entry.attempts ?? 1);
+    setSendError(null);
+  };
+
+  const cancelEditSend = () => {
+    setEditingSendId(null);
+    setSendError(null);
+  };
+
+  const requestDeleteSend = (entryId) => {
+    setDeletingSendId(entryId);
+    setSendError(null);
+  };
+
+  const cancelDeleteSend = () => {
+    setDeletingSendId(null);
+  };
+
+  const confirmDeleteSend = async (entryId) => {
+    setSendDeleting(true);
+    setSendError(null);
+    try {
+      const uid = session?.user?.id;
+      if (!uid) throw new Error("You need to be signed in to delete a send.");
+
+      const { error, count } = await supabase
+        .from("sends")
+        .delete({ count: "exact" })
+        .eq("id", entryId)
+        .eq("user_id", uid);
+
+      if (error) throw error;
+      if (!count) {
+        throw new Error(
+          "Delete didn't go through — this is almost always a Row Level Security policy on 'sends' blocking deletes. Make sure there's a DELETE policy like: using (auth.uid() = user_id)."
+        );
+      }
+
+      setLogs((prev) => prev.filter((item) => item.id !== entryId));
+      setDeletingSendId(null);
+      if (editingSendId === entryId) setEditingSendId(null);
+    } catch (err) {
+      setSendError(err.message ?? "Unable to delete send.");
+    } finally {
+      setSendDeleting(false);
+    }
+  };
+
+  const saveEditedSend = async (entryId) => {
+    setSendSaving(true);
+    setSendError(null);
+    try {
+      const attempts = Number(editAttempts) || 1;
+      const uid = session?.user?.id;
+      const entry = logs.find((item) => item.id === entryId);
+
+      if (!uid) throw new Error("You need to be signed in to edit a send.");
+      if (!entry) throw new Error("Send not found.");
+
+      // Filter by user_id as well as id. This is defense-in-depth (RLS should
+      // already scope this), and it also means that if RLS is misconfigured
+      // we fail with a clearer error instead of silently updating 0 rows.
+      const { data, error } = await supabase
+        .from("sends")
+        .update({ attempts })
+        .eq("id", entryId)
+        .eq("user_id", uid)
+        .select("*")
+        .maybeSingle();
+
+      if (error) throw error;
+      if (!data) {
+        // Supabase/PostgREST returns no error AND no row here when the
+        // UPDATE matched 0 rows. Given we already confirmed the row exists
+        // in `logs` and belongs to this user, the near-certain cause is
+        // Row Level Security on the `sends` table blocking the UPDATE (or
+        // its RETURNING/select) for this user.
+        throw new Error(
+          "Update didn't go through — this is almost always a Row Level Security policy on 'sends' blocking updates. Make sure there's an UPDATE policy like: using (auth.uid() = user_id) with check (auth.uid() = user_id)."
+        );
+      }
+
+      setLogs((prev) => prev.map((item) =>
+        item.id === entryId ? { ...item, attempts } : item
+      ));
+      setEditingSendId(null);
+    } catch (err) {
+      setSendError(err.message ?? "Unable to save changes.");
+    } finally {
+      setSendSaving(false);
+    }
   };
 
   const handleAvatarPick = (e) => {
@@ -293,55 +540,58 @@ export default function Profile() {
   const s = {
     root: {
       minHeight: "100dvh",
-      background: "#0F0F1A",
-      color: "#F0F0F0",
+      background: "#141414",
+      color: "#F8F7F4",
       fontFamily: "'Inter', system-ui, sans-serif",
       maxWidth: 430,
       margin: "0 auto",
-      paddingBottom: 90, // leave room for bottom nav
+      paddingBottom: 90,
     },
     header: {
-      background: "linear-gradient(160deg, #1A1A2E 0%, #0F0F1A 100%)",
-      padding: "52px 20px 24px",
+      background: "#1A1A1A",
+      borderBottom: "1px solid #2A2A2A",
+      padding: "24px 20px 20px",
       position: "relative",
     },
     avatar: {
       width: 72, height: 72, borderRadius: "50%",
-      border: "3px solid #E94560",
+      border: "2px solid #FFD600",
       objectFit: "cover",
-      background: "#1A1A2E",
+      background: "#1A1A1A",
       display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 28, fontWeight: 800, color: "#E94560",
+      fontSize: 28, fontWeight: 800, color: "#FFD600",
     },
-    name: { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, marginTop: 12 },
-    handle: { fontSize: 13, color: "#666", marginTop: 2 },
+    name: { fontSize: 22, fontWeight: 800, letterSpacing: -0.5, marginTop: 8 },
+    handle: { fontSize: 13, color: "#9CA3AF", marginTop: 2 },
     signOutBtn: {
-      position: "absolute", top: 54, right: 20,
-      background: "none", border: "1px solid #2A2A3E",
-      color: "#666", borderRadius: 20, padding: "5px 14px",
+      position: "absolute", top: 20, right: 20,
+      background: "transparent", border: "1px solid #2A2A2A",
+      color: "#9CA3AF", borderRadius: 999, padding: "6px 12px",
       fontSize: 12, cursor: "pointer",
     },
-    section: { padding: "0 20px", marginTop: 24 },
+    section: { padding: "0 20px", marginTop: 20 },
     sectionTitle: {
-      fontSize: 11, fontWeight: 700, color: "#555",
+      fontSize: 11, fontWeight: 700, color: "#9CA3AF",
       textTransform: "uppercase", letterSpacing: 1.2, marginBottom: 12,
     },
     tabRow: {
       display: "flex", gap: 0,
-      background: "#1A1A2E", borderRadius: 12,
+      background: "#1A1A1A", borderRadius: 12,
       padding: 4, margin: "0 20px", marginTop: 20,
+      border: "1px solid #2A2A2A",
     },
     tab: (active) => ({
       flex: 1, padding: "9px 0", textAlign: "center",
       borderRadius: 9, fontSize: 13, fontWeight: 600,
       cursor: "pointer", border: "none",
-      background: active ? "#E94560" : "transparent",
-      color: active ? "#fff" : "#555",
+      background: active ? "#FFD600" : "transparent",
+      color: active ? "#141414" : "#9CA3AF",
       transition: "all 0.2s",
     }),
     loginCard: {
       margin: "60px 20px 0",
-      background: "#1A1A2E",
+      background: "#1A1A1A",
+      border: "1px solid #2A2A2A",
       borderRadius: 20,
       padding: "36px 24px",
       textAlign: "center",
@@ -349,7 +599,7 @@ export default function Profile() {
     googleBtn: {
       marginTop: 24, width: "100%",
       display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-      background: "#fff", color: "#111",
+      background: "#F8F7F4", color: "#141414",
       border: "none", borderRadius: 14,
       padding: "14px 20px", fontSize: 15, fontWeight: 600,
       cursor: "pointer",
@@ -360,17 +610,16 @@ export default function Profile() {
   if (!session && !loading) {
     return (
       <div style={s.root}>
-        {/* Chalk-texture top accent */}
         <div style={{
-          height: 4,
-          background: "linear-gradient(90deg, #E94560, #C77DFF, #4D96FF)",
+          height: 3,
+          background: "#FFD600",
         }} />
         <div style={s.loginCard}>
-          <div style={{ fontSize: 48, marginBottom: 16 }}>🧗</div>
+          <div style={{ fontSize: 36, marginBottom: 16, color: "#FFD600" }}>◉</div>
           <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: -0.3 }}>
             Track your sends
           </div>
-          <div style={{ fontSize: 14, color: "#666", marginTop: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: 14, color: "#9CA3AF", marginTop: 8, lineHeight: 1.5 }}>
             Sign in to log climbs, track your progress, and compete on the leaderboard.
           </div>
           <button
@@ -406,10 +655,9 @@ export default function Profile() {
   // ── Signed-in view ───────────────────────────────────────────────────────
   return (
     <div style={s.root}>
-      {/* Top gradient stripe */}
       <div style={{
-        height: 4,
-        background: "linear-gradient(90deg, #E94560, #C77DFF, #4D96FF)",
+        height: 3,
+        background: "#FFD600",
       }} />
 
       {/* Header */}
@@ -440,12 +688,12 @@ export default function Profile() {
                 style={{
                   position: "absolute", bottom: 0, right: 0,
                   width: 24, height: 24, borderRadius: "50%",
-                  background: "#E94560", border: "2px solid #0F0F1A",
+                  background: "#FFD600", border: "2px solid #141414",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: "pointer", fontSize: 12,
+                  cursor: "pointer", fontSize: 12, color: "#141414",
                 }}
               >
-                📷
+                +
               </div>
             )}
             <input
@@ -461,7 +709,7 @@ export default function Profile() {
           <div style={{ flex: 1, minWidth: 0 }}>
             {editing ? (
               <div>
-                <div style={{ fontSize: 11, color: "#555", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>
+                <div style={{ fontSize: 11, color: "#9CA3AF", textTransform: "uppercase", letterSpacing: 0.8, marginBottom: 6 }}>
                   Username
                 </div>
                 <input
@@ -471,14 +719,14 @@ export default function Profile() {
                   maxLength={20}
                   style={{
                     width: "100%", boxSizing: "border-box",
-                    background: "#0F0F1A", border: "1.5px solid #E94560",
+                    background: "#141414", border: "1.5px solid #FFD600",
                     borderRadius: 10, padding: "9px 12px",
-                    color: "#F0F0F0", fontSize: 15, fontWeight: 700,
+                    color: "#F8F7F4", fontSize: 15, fontWeight: 700,
                     outline: "none", letterSpacing: -0.2,
                   }}
                 />
                 {saveError && (
-                  <div style={{ fontSize: 12, color: "#E94560", marginTop: 6 }}>
+                  <div style={{ fontSize: 12, color: "#F97316", marginTop: 6 }}>
                     {saveError}
                   </div>
                 )}
@@ -513,8 +761,8 @@ export default function Profile() {
                 disabled={saving}
                 style={{
                   flex: 1, padding: "10px 0", borderRadius: 12,
-                  background: "#E94560", border: "none",
-                  color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                  background: "#FFD600", border: "none",
+                  color: "#141414", fontWeight: 700, fontSize: 14, cursor: "pointer",
                   opacity: saving ? 0.6 : 1,
                 }}
               >
@@ -525,8 +773,8 @@ export default function Profile() {
                 disabled={saving}
                 style={{
                   flex: 1, padding: "10px 0", borderRadius: 12,
-                  background: "#1A1A2E", border: "1px solid #2A2A3E",
-                  color: "#888", fontWeight: 600, fontSize: 14, cursor: "pointer",
+                  background: "#1A1A1A", border: "1px solid #2A2A2A",
+                  color: "#9CA3AF", fontWeight: 600, fontSize: 14, cursor: "pointer",
                 }}
               >
                 Cancel
@@ -537,8 +785,8 @@ export default function Profile() {
               onClick={openEdit}
               style={{
                 padding: "9px 20px", borderRadius: 12,
-                background: "#1A1A2E", border: "1px solid #2A2A3E",
-                color: "#aaa", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                background: "#1A1A1A", border: "1px solid #2A2A2A",
+                color: "#9CA3AF", fontWeight: 600, fontSize: 13, cursor: "pointer",
               }}
             >
               Edit profile
@@ -555,11 +803,6 @@ export default function Profile() {
       </div>
       {statsError && (
         <div style={{ padding: "10px 20px", color: "#E94560", fontSize: 13 }}>
-          {statsError}
-        </div>
-      )}
-      {statsError && (
-        <div style={{ color: "#E94560", fontSize: 13, padding: "10px 20px" }}>
           {statsError}
         </div>
       )}
@@ -609,7 +852,23 @@ export default function Profile() {
           ) : (
             <div>
               {logs.map((entry, i) => (
-                <LogRow key={entry.id ?? i} entry={entry} />
+                <LogRow
+                  key={entry.id ?? i}
+                  entry={entry}
+                  isEditing={editingSendId === entry.id}
+                  editAttempts={editAttempts}
+                  onStartEdit={() => beginEditSend(entry)}
+                  onCancelEdit={cancelEditSend}
+                  onChangeAttempts={setEditAttempts}
+                  onSaveEdit={saveEditedSend}
+                  saving={sendSaving}
+                  error={(editingSendId === entry.id || deletingSendId === entry.id) ? sendError : null}
+                  isDeleting={deletingSendId === entry.id}
+                  onRequestDelete={requestDeleteSend}
+                  onCancelDelete={cancelDeleteSend}
+                  onConfirmDelete={confirmDeleteSend}
+                  deleting={sendDeleting}
+                />
               ))}
             </div>
           )}

@@ -5,8 +5,8 @@ import { supabase, signInWithGoogle, signOut, getProfile, upsertProfile } from '
 import Home from './pages/Home';
 import GymMap from './pages/GymMap';
 import Profile from './pages/Profile';
-// import RoutesPage from './pages/Routes';
-// import Clips      from './pages/Clips';
+import Leaderboard from './pages/Leaderboard';
+
 
 // ─── Auth context ─────────────────────────────────────────────────────────────
 const AuthContext = createContext(null);
@@ -72,9 +72,9 @@ const IconRoutes = () => (
     <circle cx="12" cy="5" r="3"/><path d="M12 8v13M9 18h6"/>
   </svg>
 );
-const IconClips = () => (
+const IconLeaderboard = () => (
   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <polygon points="5 3 19 12 5 21 5 3"/>
+    <rect x="2" y="14" width="4" height="7"/><rect x="9" y="9" width="4" height="12"/><rect x="16" y="4" width="4" height="17"/>
   </svg>
 );
 const IconProfile = () => (
@@ -88,7 +88,7 @@ function MobileHeader() {
   const { session, profile, login } = useAuth();
   return (
     <header className="mobile-header">
-      <span className="mobile-header__logo">⬡ Crux</span>
+      <span className="mobile-header__logo">⬡ Hangar18</span>
       {session ? (
         <NavLink to={`/profile/${profile?.id}`}>
           <img
@@ -110,12 +110,11 @@ function MobileHeader() {
 function BottomNav() {
   const { session, profile } = useAuth();
   const location = useLocation();
-  const at = (path) => location.pathname === path;
 
   const tabs = [
-    { to: '/',        label: 'Home',      Icon: IconHome },
-    { to: '/routes',  label: 'Routes',    Icon: IconRoutes },
-    { to: '/clips',   label: 'Leaderboard',   Icon: IconClips },
+    { to: '/',             label: 'Home',        Icon: IconHome },
+    { to: '/routes',       label: 'Routes',      Icon: IconRoutes },
+    { to: '/leaderboard',  label: 'Leaderboard', Icon: IconLeaderboard },
     { to: session ? `/profile/${profile?.id}` : '/profile', label: 'Me', Icon: IconProfile },
   ];
 
@@ -142,9 +141,9 @@ function TopNav() {
   return (
     <nav className="top-nav">
       <div className="container top-nav__inner">
-        <NavLink to="/" className="top-nav__logo">⬡ Crux</NavLink>
+        <NavLink to="/" className="top-nav__logo">⬡ Hangar18</NavLink>
         <div className="top-nav__links">
-          {['/', '/routes', '/clips'].map((path, i) => {
+          {['/', '/routes', '/leaderboard'].map((path, i) => {
             const labels = ['Home', 'Routes', 'Leaderboard'];
             return (
               <NavLink key={path} to={path} end={path === '/'} className={({ isActive }) => `top-nav__link${isActive ? ' active' : ''}`}>
@@ -205,8 +204,8 @@ export default function App() {
             <Route path="/"              element={<Home />} />
             <Route path="/auth/callback" element={<AuthCallback />} />
             <Route path="/routes"        element={<GymMap />} />
-          <Route path="/profile/:id"   element={<Profile />} />
-          {/* <Route path="/clips"         element={<Clips />} /> */}
+            <Route path="/leaderboard"   element={<Leaderboard />} />
+            <Route path="/profile/:id"   element={<Profile />} />
           </Routes>
         </main>
 

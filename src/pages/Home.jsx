@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { getRecentSends, getActiveRoutes, getRecentClips } from '../services/supabase';
+import { supabase } from '../services/supabase';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const HOLD_COLORS = {
@@ -25,7 +27,8 @@ function GradePill({ grade, color }) {
 }
 
 function SendBadge({ type }) {
-  return <span className={`send-badge send-badge--${type}`}>{type}</span>;
+  const badgeType = type || 'send';
+  return <span className={`send-badge send-badge--${badgeType}`}>{badgeType}</span>;
 }
 
 function timeAgo(ts) {
@@ -34,6 +37,59 @@ function timeAgo(ts) {
   if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
+}
+
+// ─── Leaderboard scoring (mirrors Leaderboard.jsx) ────────────────────────────
+const GRADE_POINTS = {
+  "VB": 10, "V0": 20, "V1": 35, "V2": 50, "V3": 70,
+  "V4": 95, "V5": 125, "V6": 160, "V7": 200, "V8": 250,
+  "V9": 310, "V10": 380, "V11": 460, "V12": 550,
+  "V13": 650, "V14": 760, "V15": 880, "V16": 1000,
+};
+const ROPE_GRADE_POINTS = {
+  "5.5": 15, "5.6": 20, "5.7": 28, "5.8": 38, "5.9": 50,
+  "5.10a": 65, "5.10b": 72, "5.10c": 80, "5.10d": 90,
+  "5.11a": 105, "5.11b": 115, "5.11c": 128, "5.11d": 145,
+  "5.12a": 170, "5.12b": 195, "5.12c": 225, "5.12d": 260,
+  "5.13a": 305, "5.13b": 360, "5.13c": 425, "5.13d": 500,
+};
+function gradeToPoints(grade) {
+  if (!grade) return 0;
+  const upper = grade.toUpperCase().trim();
+  if (upper in GRADE_POINTS) return GRADE_POINTS[upper];
+  if (grade in ROPE_GRADE_POINTS) return ROPE_GRADE_POINTS[grade];
+  const match = upper.match(/^V(\d+)/);
+  if (match) return GRADE_POINTS[`V${match[1]}`] || parseInt(match[1]) * 30;
+  return 10;
+}
+function attemptsMultiplier(attempts) {
+  if (attempts <= 0) return 1;
+  if (attempts === 1) return 1.5;
+  if (attempts === 2) return 1.2;
+  if (attempts <= 4) return 1.0;
+  if (attempts <= 8) return 0.85;
+  return 0.7;
+}
+function calcSendScore(grade, attempts) {
+  return Math.round(gradeToPoints(grade) * attemptsMultiplier(attempts));
+}
+function aggregateSends(sends) {
+  const userMap = {};
+  sends.forEach(send => {
+    const profile = send.profiles;
+    const route   = send.routes;
+    if (!profile || !route) return;
+    const uid = send.user_id;
+    if (!userMap[uid]) {
+      userMap[uid] = { id: uid, username: profile.username || 'Unknown', avatar_url: profile.avatar_url || null, totalScore: 0 };
+    }
+    const grade = route.grade || '';
+    userMap[uid].totalScore += calcSendScore(grade, send.attempts);
+  });
+  return Object.values(userMap)
+    .sort((a, b) => b.totalScore - a.totalScore)
+    .slice(0, 3)
+    .map((u, i) => ({ ...u, rank: i + 1 }));
 }
 
 // ─── Send card ─────────────────────────────────────────────────────────────────
@@ -61,7 +117,6 @@ function SendCard({ send }) {
             <span className="text-muted text-xs" style={{ flexShrink: 0 }}>{route.wall_section}</span>
           )}
         </div>
-        {/* no notes field on sends table */}
       </div>
     </div>
   );
@@ -125,6 +180,67 @@ function ClipCard({ clip }) {
   );
 }
 
+// ─── Mini podium (home leaderboard tab) ───────────────────────────────────────
+const MEDAL       = ['🥇', '🥈', '🥉'];
+const PODIUM_H    = ['64px', '48px', '40px'];
+const PODIUM_CLR  = [
+  'linear-gradient(135deg,#b8860b,#ffd700,#b8860b)',
+  'linear-gradient(135deg,#6b7280,#d1d5db,#6b7280)',
+  'linear-gradient(135deg,#7c3d1a,#cd7f32,#7c3d1a)',
+];
+
+function MiniAvatar({ username, avatarUrl, size = 36 }) {
+  const colors = ['#4FC3F7','#6FCF97','#F97316','#A855F7','#EF4444','#EAB308'];
+  const bg = colors[(username?.charCodeAt(0) || 0) % colors.length];
+  if (avatarUrl) {
+    return <img src={avatarUrl} alt={username} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', border: '2px solid #2a2a2a', flexShrink: 0 }} />;
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: size * 0.35, color: '#141414', flexShrink: 0, border: '2px solid #2a2a2a' }}>
+      {username?.slice(0, 2).toUpperCase() ?? '?'}
+    </div>
+  );
+}
+
+function MiniPodium({ top3, navigate }) {
+  // Sort by rank so a single entry always appears as #1 in the centre
+  const ranked = [...top3].sort((a, b) => a.rank - b.rank);
+  const displayOrder = [ranked[1], ranked[0], ranked[2]].filter(Boolean);
+
+  return (
+    <div style={{ background: '#141414', borderRadius: 16, padding: '20px 16px 0', marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8 }}>
+        {displayOrder.map((user) => {
+          const pos = user.rank - 1; // rank 1 → pos 0 (gold), rank 2 → pos 1 (silver), etc.
+          const isFirst = pos === 0;
+          return (
+            <div key={user.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <span style={{ fontSize: isFirst ? 24 : 18 }}>{MEDAL[pos]}</span>
+              <MiniAvatar username={user.username} avatarUrl={user.avatar_url} size={isFirst ? 44 : 36} />
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: 11, fontWeight: 700, color: '#F8F7F4', textAlign: 'center', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {user.username}
+              </span>
+              <div style={{ width: '100%', height: PODIUM_H[pos], background: PODIUM_CLR[pos], borderRadius: '6px 6px 0 0', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontSize: isFirst ? 16 : 13, fontWeight: 800, color: '#141414' }}>
+                  {user.totalScore.toLocaleString()}
+                </span>
+                <span style={{ fontSize: 9, color: '#141414', opacity: 0.6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>pts</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      {/* View full leaderboard link */}
+      <button
+        onClick={() => navigate('/leaderboard')}
+        style={{ width: '100%', marginTop: 14, padding: '10px 0', background: 'transparent', border: '1px solid #252525', borderRadius: 10, color: '#4FC3F7', fontFamily: "'Space Grotesk', sans-serif", fontSize: 12, fontWeight: 700, cursor: 'pointer', letterSpacing: 0.5, textTransform: 'uppercase' }}
+      >
+        View full leaderboard →
+      </button>
+    </div>
+  );
+}
+
 // ─── Hero (logged-out) ────────────────────────────────────────────────────────
 function Hero({ login }) {
   return (
@@ -174,15 +290,61 @@ function SectionHead({ title, meta }) {
 // ─── Home ─────────────────────────────────────────────────────────────────────
 export default function Home() {
   const { session, login } = useAuth();
-  const [tab,    setTab]    = useState('sends'); // 'sends' | 'routes' | 'clips'
-  const [sends,  setSends]  = useState(null);
-  const [routes, setRoutes] = useState(null);
-  const [clips,  setClips]  = useState(null);
+  const navigate = useNavigate();
+
+  const [tab,        setTab]        = useState('sends');
+  const [sends,      setSends]      = useState(null);
+  const [sendsError, setSendsError] = useState(null);
+  const [routes,     setRoutes]     = useState(null);
+  const [clips,      setClips]      = useState(null);
+  const [top3,       setTop3]       = useState(null);
+
+  const loadHomeSends = () => {
+    getRecentSends(20).then(({ data, error }) => {
+      if (error) {
+        setSendsError(error.message || 'Unable to load recent sends.');
+        setSends([]);
+      } else {
+        setSendsError(null);
+        setSends(data ?? []);
+      }
+    });
+  };
+
+  const loadHomeClips = () => {
+    getRecentClips(12).then(({ data, error }) => {
+      if (error) {
+        setClips([]);
+        return;
+      }
+      setClips(data ?? []);
+    }).catch(() => setClips([]));
+  };
+
+  const loadTop3 = async () => {
+    const { data: sends } = await supabase
+      .from('sends')
+      .select(`*, profiles!sends_user_id_fkey (id, username, avatar_url), routes (id, grade, tag_color, hold_color)`)
+      .order('created_at', { ascending: false });
+    setTop3(aggregateSends(sends ?? []));
+  };
 
   useEffect(() => {
-    getRecentSends(20).then(({ data })  => setSends(data  ?? []));
-    getActiveRoutes().then(({ data })   => setRoutes(data ?? []));
-    getRecentClips(12).then(({ data })  => setClips(data  ?? []));
+    loadHomeSends();
+    getActiveRoutes().then(({ data, error }) => {
+      setRoutes(error ? [] : data ?? []);
+    });
+    loadHomeClips();
+    loadTop3();
+
+    const handleClipAdded = () => loadHomeClips();
+    const handleSendAdded = () => { loadHomeSends(); loadTop3(); };
+    window.addEventListener('clip-added', handleClipAdded);
+    window.addEventListener('send-added', handleSendAdded);
+    return () => {
+      window.removeEventListener('clip-added', handleClipAdded);
+      window.removeEventListener('send-added', handleSendAdded);
+    };
   }, []);
 
   return (
@@ -190,7 +352,6 @@ export default function Home() {
       <div className="container page-content">
         {!session && <Hero login={login} />}
 
-        {/* In-page tabs — mobile-friendly single-column layout */}
         <div className="tabs">
           {[
             { id: 'sends',  label: 'Sends' },
@@ -211,6 +372,9 @@ export default function Home() {
         {tab === 'sends' && (
           <section>
             <SectionHead title="Recent sends" meta={sends ? `${sends.length} logged` : ''} />
+            {sendsError && (
+              <p className="text-danger text-sm" style={{ marginBottom: '0.75rem' }}>{sendsError}</p>
+            )}
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
               {sends === null
                 ? <Skeletons count={5} height={88} />
@@ -240,24 +404,29 @@ export default function Home() {
         {/* ── Leaderboard tab ── */}
         {tab === 'clips' && (
           <section>
-            <SectionHead title="Leaderboard" />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem' }}>
-              {clips === null
-                ? Array.from({ length: 6 }).map((_, i) => (
-                    <div key={i} className="skeleton" style={{ aspectRatio: '9/16', borderRadius: 'var(--radius)' }} />
-                  ))
-                : clips.length === 0
-                  ? <p className="text-muted text-sm">No leaderboard entries yet.</p>
-                  : clips.map(c => <ClipCard key={c.id} clip={c} />)
-              }
-            </div>
+            <SectionHead title="Top climbers" />
+            {top3 === null ? (
+              <div style={{ display: 'flex', gap: 8 }}>
+                {[80, 100, 72].map((h, i) => (
+                  <div key={i} className="skeleton" style={{ flex: 1, height: h + 120, borderRadius: 12 }} />
+                ))}
+              </div>
+            ) : top3.length === 0 ? (
+              <p className="text-muted text-sm">No sends logged yet — get on the wall!</p>
+            ) : (
+              <MiniPodium top3={top3} navigate={navigate} />
+            )}
           </section>
         )}
       </div>
 
-      {/* FAB — log a send (only when logged in) */}
+      {/* FAB — navigate to routes to log a send */}
       {session && (
-        <button className="fab" aria-label="Log a send">
+        <button
+          className="fab"
+          aria-label="Log a send"
+          onClick={() => navigate('/routes')}
+        >
           +
         </button>
       )}
