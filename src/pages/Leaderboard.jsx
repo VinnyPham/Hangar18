@@ -453,6 +453,28 @@ function FriendSearchModal({ currentUserId, onClose }) {
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
   const [sentIds, setSentIds] = useState(new Set());
+  const [sendingId, setSendingId] = useState(null);
+  const [sendError, setSendError] = useState(null);
+
+  // Pre-load anyone we already have a pending/accepted request with,
+  // so we don't try (and silently fail) to insert a duplicate row.
+  useEffect(() => {
+    if (!currentUserId) return;
+    supabase
+      .from("friend_requests")
+      .select("sender_id, receiver_id, status")
+      .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`)
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("Failed to load existing friend requests:", error);
+          return;
+        }
+        const ids = (data ?? [])
+          .filter(r => r.status === "pending" || r.status === "accepted")
+          .map(r => (r.sender_id === currentUserId ? r.receiver_id : r.sender_id));
+        setSentIds(new Set(ids));
+      });
+  }, [currentUserId]);
 
   const performSearch = async (searchText = query) => {
     const trimmed = searchText.trim();
@@ -462,12 +484,13 @@ function FriendSearchModal({ currentUserId, onClose }) {
     }
 
     setSearching(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("id, username, avatar_url")
       .ilike("username", `%${trimmed}%`)
       .neq("id", currentUserId)
       .limit(10);
+    if (error) console.error("Friend search failed:", error);
     setResults(data ?? []);
     setSearching(false);
   };
@@ -484,11 +507,29 @@ function FriendSearchModal({ currentUserId, onClose }) {
   };
 
   const sendRequest = async (receiverId) => {
-    await supabase.from("friend_requests").insert({
+    if (sentIds.has(receiverId) || sendingId) return;
+    setSendError(null);
+    setSendingId(receiverId);
+
+    const { error } = await supabase.from("friend_requests").insert({
       sender_id: currentUserId,
       receiver_id: receiverId,
       status: "pending",
     });
+
+    setSendingId(null);
+
+    if (error) {
+      console.error("Failed to send friend request:", error);
+      // 23505 = unique_violation -> a request already exists either direction
+      if (error.code === "23505") {
+        setSentIds(s => new Set([...s, receiverId]));
+      } else {
+        setSendError("Couldn't send friend request. Please try again.");
+      }
+      return;
+    }
+
     setSentIds(s => new Set([...s, receiverId]));
   };
 
@@ -551,6 +592,16 @@ function FriendSearchModal({ currentUserId, onClose }) {
           </button>
         </form>
 
+        {sendError && (
+          <div style={{
+            marginBottom: 12, padding: "8px 12px", borderRadius: 8,
+            background: "#2a1515", border: "1px solid #ef444440",
+            color: "#f87171", fontSize: 12, fontFamily: "'Inter', sans-serif",
+          }}>
+            {sendError}
+          </div>
+        )}
+
         {/* Results */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
           {results.length === 0 && query.trim().length >= 2 && !searching && (
@@ -560,6 +611,7 @@ function FriendSearchModal({ currentUserId, onClose }) {
           )}
           {results.map(user => {
             const sent = sentIds.has(user.id);
+            const sending = sendingId === user.id;
             return (
               <div key={user.id} style={{
                 display: "flex", alignItems: "center", gap: 10,
@@ -574,17 +626,20 @@ function FriendSearchModal({ currentUserId, onClose }) {
                   {user.username}
                 </span>
                 <button
-                  onClick={() => !sent && sendRequest(user.id)}
+                  onClick={() => sendRequest(user.id)}
+                  disabled={sent || sending}
                   style={{
                     padding: "6px 14px", borderRadius: 20, border: "none",
                     background: sent ? "#1a2e1a" : "#FFD600",
                     color: sent ? "#6FCF97" : "#141414",
                     fontFamily: "'Space Grotesk', sans-serif",
-                    fontSize: 11, fontWeight: 700, cursor: sent ? "default" : "pointer",
+                    fontSize: 11, fontWeight: 700,
+                    cursor: sent || sending ? "default" : "pointer",
                     textTransform: "uppercase", letterSpacing: 0.5,
+                    opacity: sending ? 0.6 : 1,
                   }}
                 >
-                  {sent ? "✓ Sent" : "Add"}
+                  {sent ? "✓ Sent" : sending ? "…" : "Add"}
                 </button>
               </div>
             );
