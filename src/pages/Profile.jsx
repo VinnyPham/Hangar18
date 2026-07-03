@@ -149,8 +149,8 @@ function LogRow({
   entry, isEditing, editAttempts, onStartEdit, onCancelEdit, onChangeAttempts, onSaveEdit, saving, error,
   isDeleting, onRequestDelete, onCancelDelete, onConfirmDelete, deleting,
 }) {
-  const gradeCode = normalizeGrade(entry.grade ?? entry.routes?.grade);
-  const color = GRADE_COLORS[gradeCode] ?? "#aaa";
+  const grade = normalizeGrade(entry.grade ?? entry.routes?.grade);
+  const color = GRADE_COLORS[grade] ?? "#aaa";
   const date = new Date(entry.created_at).toLocaleDateString("en-US", {
     month: "short", day: "numeric",
   });
@@ -164,11 +164,7 @@ function LogRow({
         <div style={{
           width: 36, height: 36, borderRadius: 10,
           background: `${color}22`, border: `1.5px solid ${color}`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontWeight: 800, fontSize: 11, color,
-        }}>
-          {grade ?? "?"}
-        </div>
+        }} />
         <div style={{ flex: 1 }}>
           <div style={{ fontWeight: 600, color: "#F8F7F4", fontSize: 14 }}>
             {grade ?? "Unknown grade"}
