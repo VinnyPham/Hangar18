@@ -826,7 +826,7 @@ export default function Profile() {
               textAlign: "center", padding: "36px 0",
               color: "#444", fontSize: 14, lineHeight: 1.6,
             }}>
-              No climbs logged yet.{"\n"}Head to Routes to log your first send!
+              No climbs logged yet.{"\n"}
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>

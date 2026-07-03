@@ -123,11 +123,23 @@ function SendCard({ send }) {
 }
 
 // ─── Route row ─────────────────────────────────────────────────────────────────
-function RouteRow({ route }) {
+function RouteRow({ route, onClick }) {
   return (
-    <div
+    <button
+      type="button"
+      onClick={onClick}
       className="card"
-      style={{ padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', gap: '0.85rem', cursor: 'pointer', minHeight: '60px' }}
+      style={{
+        padding: '0.85rem 1rem',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.85rem',
+        cursor: 'pointer',
+        minHeight: '60px',
+        textAlign: 'left',
+        border: 'none',
+        background: 'var(--surface)',
+      }}
     >
       <GradePill grade={route.grade} color={route.color} />
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -140,7 +152,7 @@ function RouteRow({ route }) {
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--text-faint)" strokeWidth="2">
         <path d="M9 18l6-6-6-6"/>
       </svg>
-    </div>
+    </button>
   );
 }
 
@@ -379,7 +391,7 @@ export default function Home() {
               {sends === null
                 ? <Skeletons count={5} height={88} />
                 : sends.length === 0
-                  ? <p className="text-muted text-sm">No sends yet — be the first!</p>
+                  ? <p className="text-muted text-sm">No sends yet</p>
                   : sends.map(s => <SendCard key={s.id} send={s} />)
               }
             </div>
@@ -395,7 +407,13 @@ export default function Home() {
                 ? <Skeletons count={6} height={64} />
                 : routes.length === 0
                   ? <p className="text-muted text-sm">No active routes.</p>
-                  : routes.map(r => <RouteRow key={r.id} route={r} />)
+                  : routes.map(r => (
+                  <RouteRow
+                    key={r.id}
+                    route={r}
+                    onClick={() => navigate('/routes', { state: { routeId: r.id } })}
+                  />
+                ))
               }
             </div>
           </section>
@@ -412,7 +430,7 @@ export default function Home() {
                 ))}
               </div>
             ) : top3.length === 0 ? (
-              <p className="text-muted text-sm">No sends logged yet — get on the wall!</p>
+              <p className="text-muted text-sm">No sends logged yet</p>
             ) : (
               <MiniPodium top3={top3} navigate={navigate} />
             )}

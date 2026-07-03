@@ -922,8 +922,8 @@ export default function Leaderboard() {
                   </div>
                   <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, color: "#6b7280" }}>
                     {view === "friends"
-                      ? "Tap \"Add friend\" to find climbers to compete with"
-                      : "Get on the wall and start sending!"}
+                      ? "Tap \"Add friend\" to find climbers"
+                      : ":("}
                   </div>
                 </div>
               )}

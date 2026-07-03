@@ -15,10 +15,19 @@ import MapImage from '../assets/Map.png';
 import MapLabel from './MapLabel';
 
 const HOLD_COLORS = {
-  yellow: '#FFD600', green: '#4CAF50', blue: '#2196F3', red: '#F44336',
-  black: '#424242',  white: '#F5F5F5', pink: '#E91E63',
-  orange: '#FF9800', purple: '#9C27B0',
+  yellow: '#FFD600', green: '#4CAF50', blue: '#2196F3', red: '#E53935',
+  black: '#424242', white: '#F5F5F5', pink: '#FF2D8F',
+  orange: '#FF6D00', purple: '#9C27B0',
 };
+
+function hexToRgba(hex, alpha = 1) {
+  const cleaned = hex.replace('#', '');
+  const bigint = parseInt(cleaned.length === 3 ? cleaned.split('').map(c => c + c).join('') : cleaned, 16);
+  const r = (bigint >> 16) & 255;
+  const g = (bigint >> 8) & 255;
+  const b = bigint & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
@@ -62,6 +71,7 @@ function buildClusters(routes) {
 function RoutePin({ route, containerW, containerH, zoom, onClick }) {
   if (route.pin_x == null || route.pin_y == null) return null;
   const color = HOLD_COLORS[route.color?.toLowerCase()] ?? '#555';
+  const outline = hexToRgba(color, 0.25);
   const size = clamp(18 / zoom, 12, 18);
 
   return (
@@ -78,8 +88,8 @@ function RoutePin({ route, containerW, containerH, zoom, onClick }) {
         borderRadius: '50% 50% 50% 0',
         rotate: '-45deg',
         background: color,
-        border: '2px solid rgba(255,255,255,0.6)',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.5)',
+        border: `1.5px solid ${outline}`,
+        boxShadow: `0 2px 12px ${hexToRgba(color, 0.15)}`,
         cursor: 'pointer',
         padding: 0,
         display: 'flex',
@@ -87,7 +97,7 @@ function RoutePin({ route, containerW, containerH, zoom, onClick }) {
         justifyContent: 'center',
         zIndex: 10,
         WebkitTapHighlightColor: 'transparent',
-        transition: 'transform 0.1s',
+        transition: 'transform 0.1s, box-shadow 0.15s ease',
       }}
       aria-label={`${route.name} ${route.grade}`}
     />

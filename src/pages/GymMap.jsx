@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import MapCanvas from '../components/Mapcanvas';
 import SectionPanel from '../components/Sectionpanel';
 import RouteCard from '../components/RouteCard';
 import { getActiveRoutes } from '../services/supabase';
 
 export default function GymMap() {
+  const location = useLocation();
   const [routes, setRoutes] = useState([]);
   const [section, setSection] = useState(null);
   const [selectedRoute, setSelectedRoute] = useState(null);
@@ -13,10 +15,18 @@ export default function GymMap() {
     let mounted = true;
     getActiveRoutes().then(({ data }) => {
       if (!mounted) return;
-      setRoutes(data ?? []);
+      const activeRoutes = data ?? [];
+      setRoutes(activeRoutes);
+      const routeId = location.state?.routeId;
+      if (routeId) {
+        const initialRoute = activeRoutes.find(r => r.id === routeId);
+        if (initialRoute) {
+          setSelectedRoute(initialRoute);
+        }
+      }
     }).catch(() => { /* ignore for now */ });
     return () => { mounted = false; };
-  }, []);
+  }, [location.state]);
 
   const handleSectionSelect = (sec) => setSection(sec);
   const handleRouteSelect = (route) => setSelectedRoute(route);
