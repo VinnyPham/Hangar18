@@ -62,7 +62,7 @@ function buildClusters(routes) {
 function RoutePin({ route, containerW, containerH, zoom, onClick }) {
   if (route.pin_x == null || route.pin_y == null) return null;
   const color = HOLD_COLORS[route.color?.toLowerCase()] ?? '#555';
-  const size = clamp(28 / zoom, 18, 28);
+  const size = clamp(18 / zoom, 12, 18);
 
   return (
     <button
