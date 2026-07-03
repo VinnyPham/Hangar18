@@ -454,21 +454,34 @@ function FriendSearchModal({ currentUserId, onClose }) {
   const [searching, setSearching] = useState(false);
   const [sentIds, setSentIds] = useState(new Set());
 
+  const performSearch = async (searchText = query) => {
+    const trimmed = searchText.trim();
+    if (trimmed.length < 2) {
+      setResults([]);
+      return;
+    }
+
+    setSearching(true);
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, username, avatar_url")
+      .ilike("username", `%${trimmed}%`)
+      .neq("id", currentUserId)
+      .limit(10);
+    setResults(data ?? []);
+    setSearching(false);
+  };
+
   useEffect(() => {
     if (query.trim().length < 2) { setResults([]); return; }
-    const t = setTimeout(async () => {
-      setSearching(true);
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, username, avatar_url")
-        .ilike("username", `%${query.trim()}%`)
-        .neq("id", currentUserId)
-        .limit(10);
-      setResults(data ?? []);
-      setSearching(false);
-    }, 350);
+    const t = setTimeout(() => { performSearch(query); }, 350);
     return () => clearTimeout(t);
   }, [query]);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    performSearch(query);
+  };
 
   const sendRequest = async (receiverId) => {
     await supabase.from("friend_requests").insert({
@@ -503,26 +516,40 @@ function FriendSearchModal({ currentUserId, onClose }) {
         </div>
 
         {/* Search input */}
-        <div style={{ position: "relative", marginBottom: 14 }}>
-          <input
-            autoFocus
-            value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search by username…"
+        <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 10, marginBottom: 14 }}>
+          <div style={{ position: "relative" }}>
+            <input
+              autoFocus
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search by username…"
+              style={{
+                width: "100%", padding: "10px 14px",
+                background: "#252525", border: "1px solid #333",
+                borderRadius: 10, color: "#F8F7F4",
+                fontFamily: "'Inter', sans-serif", fontSize: 14,
+                outline: "none", boxSizing: "border-box",
+              }}
+            />
+            {searching && (
+              <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#4b5563", fontSize: 12 }}>
+                …
+              </div>
+            )}
+          </div>
+          <button
+            type="submit"
             style={{
-              width: "100%", padding: "10px 14px",
-              background: "#252525", border: "1px solid #333",
-              borderRadius: 10, color: "#F8F7F4",
-              fontFamily: "'Inter', sans-serif", fontSize: 14,
-              outline: "none", boxSizing: "border-box",
+              width: '100%', padding: '11px 14px', borderRadius: 10,
+              border: 'none', background: '#FFD600', color: '#141414',
+              fontFamily: "'Space Grotesk', sans-serif", fontSize: 13,
+              fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase',
+              letterSpacing: '0.06em', boxShadow: '0 6px 14px rgba(0,0,0,0.12)'
             }}
-          />
-          {searching && (
-            <div style={{ position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", color: "#4b5563", fontSize: 12 }}>
-              …
-            </div>
-          )}
-        </div>
+          >
+            Search
+          </button>
+        </form>
 
         {/* Results */}
         <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
