@@ -9,19 +9,76 @@ const supabase = createClient(
 
 // ── Grade color map (V-scale) ──────────────────────────────────────────────
 const GRADE_COLORS = {
-  "V0": "#6BCB77", "V1": "#6BCB77", "V2": "#4D96FF",
-  "V3": "#4D96FF", "V4": "#FFD93D", "V5": "#FFD93D",
-  "V6": "#FF6B6B", "V7": "#FF6B6B", "V8": "#C77DFF",
-  "V9": "#C77DFF", "V10": "#C77DFF",
+  "VB-V0": "#F8F7F4",
+  "V0-V1": "#FFD600",
+  "V1-V2": "#4BCF00",
+  "V2-V4": "#F44336",
+  "V4-V6": "#2196F3",
+  "V5-V7": "#FF6D00",
+  "V7-V9": "#9C27B0",
+  "V9-V11": "#141414",
+  VB: "#F8F7F4",
+  V0: "#F8F7F4",
+  V1: "#FFD600",
+  V2: "#4BCF00",
+  V3: "#F44336",
+  V4: "#2196F3",
+  V5: "#FF6D00",
+  V6: "#2196F3",
+  V7: "#9C27B0",
+  V8: "#9C27B0",
+  V9: "#141414",
+  V10: "#141414",
+  V11: "#141414",
 };
 
-const GRADE_ORDER = ["V0","V1","V2","V3","V4","V5","V6","V7","V8","V9","V10"];
+const GRADE_ORDER = [
+  "VB-V0",
+  "V0-V1",
+  "V1-V2",
+  "V2-V4",
+  "V4-V6",
+  "V5-V7",
+  "V7-V9",
+  "V9-V11",
+  "VB",
+  "V0",
+  "V1",
+  "V2",
+  "V3",
+  "V4",
+  "V5",
+  "V6",
+  "V7",
+  "V8",
+  "V9",
+  "V10",
+  "V11",
+];
+
+function parseGradeValue(code) {
+  if (code === "VB") return -1;
+  return Number(code.replace(/^V/, ""));
+}
 
 function normalizeGrade(grade) {
   if (!grade || typeof grade !== "string") return null;
   const normalized = grade.trim().toUpperCase().replace(/\s+/g, "");
-  const match = normalized.match(/^(V\d{1,2})/);
-  return match ? match[1] : null;
+
+  if (normalized === "VB") return "VB";
+  if (/^V\d{1,2}$/.test(normalized)) return normalized;
+
+  const match = normalized.match(/^(VB|V\d{1,2})-(VB|V\d{1,2})$/);
+  if (!match) return null;
+
+  const [, first, second] = match;
+  const firstValue = parseGradeValue(first);
+  const secondValue = parseGradeValue(second);
+
+  if (firstValue > secondValue) {
+    return `${second}-${first}`;
+  }
+  return `${first}-${second}`;
 }
 
 function dedupeSendsByRoute(sends = []) {
@@ -92,8 +149,8 @@ function LogRow({
   entry, isEditing, editAttempts, onStartEdit, onCancelEdit, onChangeAttempts, onSaveEdit, saving, error,
   isDeleting, onRequestDelete, onCancelDelete, onConfirmDelete, deleting,
 }) {
-  const grade = normalizeGrade(entry.grade ?? entry.routes?.grade);
-  const color = GRADE_COLORS[grade] ?? "#aaa";
+  const gradeCode = normalizeGrade(entry.grade ?? entry.routes?.grade);
+  const color = GRADE_COLORS[gradeCode] ?? "#aaa";
   const date = new Date(entry.created_at).toLocaleDateString("en-US", {
     month: "short", day: "numeric",
   });

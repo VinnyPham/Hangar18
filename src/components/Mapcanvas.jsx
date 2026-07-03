@@ -69,27 +69,30 @@ function buildClusters(routes) {
 // ─── Pin components ───────────────────────────────────────────────────────────
 
 function RoutePin({ route, containerW, containerH, zoom, onClick }) {
+  const [pressed, setPressed] = useState(false);
   if (route.pin_x == null || route.pin_y == null) return null;
   const color = HOLD_COLORS[route.color?.toLowerCase()] ?? '#555';
   const outline = hexToRgba(color, 0.25);
-  const size = clamp(18 / zoom, 12, 18);
+  const size = clamp(14 / zoom, 8, 12);
 
   return (
     <button
+      onPointerDown={e => { e.stopPropagation(); setPressed(true); }}
+      onPointerUp={e => { e.stopPropagation(); setPressed(false); }}
+      onPointerCancel={e => { e.stopPropagation(); setPressed(false); }}
       onClick={e => { e.stopPropagation(); onClick(route); }}
       title={`${route.grade} – ${route.name}`}
       style={{
         position: 'absolute',
         left: `${route.pin_x}%`,
         top: `${route.pin_y}%`,
-        transform: 'translate(-50%, -100%)',
+        transform: `translate(-50%, -100%) rotate(-45deg) scale(${pressed ? 1.25 : 1})`,
         width: `${size}px`,
         height: `${size}px`,
         borderRadius: '50% 50% 50% 0',
-        rotate: '-45deg',
         background: color,
-        border: `1.5px solid ${outline}`,
-        boxShadow: `0 2px 12px ${hexToRgba(color, 0.15)}`,
+        border: `1.2px solid ${outline}`,
+        boxShadow: `0 2px 10px ${hexToRgba(color, 0.15)}`,
         cursor: 'pointer',
         padding: 0,
         display: 'flex',
@@ -97,7 +100,7 @@ function RoutePin({ route, containerW, containerH, zoom, onClick }) {
         justifyContent: 'center',
         zIndex: 10,
         WebkitTapHighlightColor: 'transparent',
-        transition: 'transform 0.1s, box-shadow 0.15s ease',
+        transition: 'transform 0.12s ease, box-shadow 0.15s ease',
       }}
       aria-label={`${route.name} ${route.grade}`}
     />
