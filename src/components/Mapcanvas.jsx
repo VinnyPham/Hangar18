@@ -12,7 +12,21 @@
 
 import { useRef, useState, useCallback, useEffect } from 'react';
 import MapImage from '../assets/Map.png';
-import MapLabel from './MapLabel';
+
+const MAP_WIDTH = 2400;
+const MAP_HEIGHT = 1800;
+
+const SECTION_LABELS = [
+  { key: 'frontslab', label: 'Front slab', x: 93, y: 50 },
+  { key: 'wave',      label: 'Wave wall', x: 70, y: 90 },
+  { key: 'accordion', label: 'Accordion wall', x: 30, y: 90 },
+  { key: 'bulge',     label: 'Bulge', x: 6,  y: 50 },
+  { key: 'roof',      label: 'Super roof', x: 60, y: 50 },
+  { key: 'staircase', label: 'Staircase wall', x: 30, y: 50 },
+  { key: 'backslab',  label: 'Back slab', x: 50, y: 10 },
+];
+
+const UNIQUE_LABELS = [...new Map(SECTION_LABELS.map(item => [item.key, item])).values()];
 
 const HOLD_COLORS = {
   yellow: '#FFD600', green: '#4CAF50', blue: '#2196F3', red: '#E53935',
@@ -31,8 +45,8 @@ function hexToRgba(hex, alpha = 1) {
 
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
-const CLUSTER_ZOOM_THRESHOLD = 2; // below this, show clusters; above, show individual pins
-const LABEL_ZOOM_THRESHOLD = 2; // labels disappear when zoomed in beyond this
+const CLUSTER_ZOOM_THRESHOLD = 2.2; // below this, show clusters; above, show individual pins
+const LABEL_ZOOM_THRESHOLD = 2.2; // labels disappear when zoomed in beyond this
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -46,69 +60,44 @@ function getDistance(t1, t2) {
   return Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
 }
 
-// Group routes by wall_section, compute centroid of their pins
-function buildClusters(routes) {
-  const map = {};
-  routes.forEach(r => {
-    const key = r.wall_section ?? 'Unknown';
-    if (!map[key]) map[key] = [];
-    map[key].push(r);
-  });
-  return Object.entries(map).map(([section, routes]) => {
-    const validPins = routes.filter(r => r.pin_x != null && r.pin_y != null);
-    const cx = validPins.length
-      ? validPins.reduce((s, r) => s + r.pin_x, 0) / validPins.length
-      : 50;
-    const cy = validPins.length
-      ? validPins.reduce((s, r) => s + r.pin_y, 0) / validPins.length
-      : 50;
-    return { section, routes, cx, cy };
-  });
-}
-
 // ─── Pin components ───────────────────────────────────────────────────────────
 
-function RoutePin({ route, containerW, containerH, zoom, onClick }) {
+function RoutePin({ route, zoom, onClick }) {
   const [pressed, setPressed] = useState(false);
   if (route.pin_x == null || route.pin_y == null) return null;
   const color = HOLD_COLORS[route.color?.toLowerCase()] ?? '#555';
   const outline = hexToRgba(color, 0.25);
-  const size = clamp(14 / zoom, 8, 12);
+  const size = clamp(32 / zoom, 25, 30);
+  const x = (route.pin_x / 100) * MAP_WIDTH;
+  const y = (route.pin_y / 100) * MAP_HEIGHT;
 
   return (
-    <button
-      onPointerDown={e => { e.stopPropagation(); setPressed(true); }}
-      onPointerUp={e => { e.stopPropagation(); setPressed(false); }}
-      onPointerCancel={e => { e.stopPropagation(); setPressed(false); }}
-      onClick={e => { e.stopPropagation(); onClick(route); }}
-      title={`${route.grade} – ${route.name}`}
-      style={{
-        position: 'absolute',
-        left: `${route.pin_x}%`,
-        top: `${route.pin_y}%`,
-        transform: `translate(-50%, -100%) rotate(-45deg) scale(${pressed ? 1.25 : 1})`,
-        width: `${size}px`,
-        height: `${size}px`,
-        borderRadius: '50% 50% 50% 0',
-        background: color,
-        border: `1.2px solid ${outline}`,
-        boxShadow: `0 2px 10px ${hexToRgba(color, 0.15)}`,
-        cursor: 'pointer',
-        padding: 0,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10,
-        WebkitTapHighlightColor: 'transparent',
-        transition: 'transform 0.12s ease, box-shadow 0.15s ease',
-      }}
+    <g
+      transform={`translate(${x} ${y})`}
+      onPointerDown={(e) => { e.stopPropagation(); setPressed(true); }}
+      onPointerUp={(e) => { e.stopPropagation(); setPressed(false); }}
+      onPointerCancel={(e) => { e.stopPropagation(); setPressed(false); }}
+      onClick={(e) => { e.stopPropagation(); onClick(route); }}
+      style={{ cursor: 'pointer' }}
       aria-label={`${route.name} ${route.grade}`}
-    />
+    >
+      <rect
+        x={-size / 2}
+        y={-size / 2}
+        width={size}
+        height={size}
+        rx={size * 0.28}
+        fill={color}
+        stroke={outline}
+        strokeWidth={Math.max(1, size * 0.08)}
+        transform={pressed ? `rotate(-45) scale(1.25)` : 'rotate(-45)'}
+      />
+      <title>{`${route.grade} – ${route.name}`}</title>
+    </g>
   );
 }
 
 function ClusterBadge({ cluster, onClick }) {
-  // Pick the most common hold color in this section for the badge accent
   const colorCounts = {};
   cluster.routes.forEach(r => {
     const c = r.color?.toLowerCase() ?? 'unknown';
@@ -116,72 +105,40 @@ function ClusterBadge({ cluster, onClick }) {
   });
   const dominantColor = Object.entries(colorCounts).sort((a, b) => b[1] - a[1])[0]?.[0];
   const accent = HOLD_COLORS[dominantColor] ?? '#E8FF47';
+  const x = (cluster.cx / 100) * MAP_WIDTH;
+  const y = (cluster.cy / 100) * MAP_HEIGHT;
 
   return (
-    <button
-      onClick={e => { e.stopPropagation(); onClick(cluster.section); }}
-      style={{
-        position: 'absolute',
-        left: `${cluster.cx}%`,
-        top: `${cluster.cy}%`,
-        transform: 'translate(-50%, -50%)',
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        gap: '3px',
-        cursor: 'pointer',
-        background: 'none',
-        border: 'none',
-        padding: 0,
-        zIndex: 20,
-        WebkitTapHighlightColor: 'transparent',
-      }}
+    <g
+      transform={`translate(${x} ${y})`}
+      onClick={(e) => { e.stopPropagation(); onClick(cluster.section); }}
+      style={{ cursor: 'pointer' }}
       aria-label={`${cluster.section} — ${cluster.routes.length} routes`}
     >
-      {/* Bubble */}
-      <div
-        style={{
-          width: '44px',
-          height: '44px',
-          borderRadius: '50%',
-          background: 'rgba(13,13,13,0.85)',
-          border: `2.5px solid ${accent}`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: `0 0 12px ${accent}55, 0 2px 8px rgba(0,0,0,0.6)`,
-          backdropFilter: 'blur(4px)',
-        }}
+      <circle cx={0} cy={0} r={42} fill='rgba(13,13,13,0.85)' stroke={accent} strokeWidth={5} />
+      <text
+        x={0}
+        y={4}
+        textAnchor='middle'
+        fontFamily='var(--font-display)'
+        fontSize='70'
+        fontWeight='700'
+        fill={accent}
       >
-        <span
-          style={{
-            fontFamily: 'var(--font-display)',
-            fontWeight: 700,
-            fontSize: '0.85rem',
-            color: accent,
-          }}
-        >
-          {cluster.routes.length}
-        </span>
-      </div>
-      {/* Label */}
-      <span
-        style={{
-          fontFamily: 'var(--font-display)',
-          fontSize: '0.6rem',
-          fontWeight: 600,
-          color: '#fff',
-          background: 'rgba(13,13,13,0.75)',
-          padding: '1px 6px',
-          borderRadius: '99px',
-          whiteSpace: 'nowrap',
-          backdropFilter: 'blur(4px)',
-          letterSpacing: '0.03em',
-        }}
+        {cluster.routes.length}
+      </text>
+      <text
+        x={0}
+        y={75}
+        textAnchor='middle'
+        fontFamily='var(--font-display)'
+        fontSize='42'
+        fontWeight='600'
+        fill='#fff'
       >
         {cluster.section}
-      </span>
-    </button>
+      </text>
+    </g>
   );
 }
 
@@ -197,8 +154,6 @@ export default function MapCanvas({ routes = [], onSectionSelect, onRouteSelect 
   const lastPan    = useRef(null);  // { x, y }
   const lastPinch  = useRef(null);  // { dist, midX, midY }
   const didMove    = useRef(false); // distinguish tap from drag
-
-  const clusters = buildClusters(routes.filter(r => r.pin_x != null || r.wall_section));
 
   // ── Constrain offset so image never shows gap edges ──────────────────────
   const constrain = useCallback((ox, oy, z, containerEl) => {
@@ -302,56 +257,68 @@ export default function MapCanvas({ routes = [], onSectionSelect, onRouteSelect 
         cursor: zoom > 1 ? 'grab' : 'default',
       }}
       ref={containerRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerCancel={onPointerUp}
-    >
-      {/* Map + pins wrapper — transformed together */}
-      <div
-        style={{
-          position: 'absolute',
-          inset: 0,
-          transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
-          transformOrigin: 'center center',
-          transition: pointers.current && Object.keys(pointers.current).length > 0
-            ? 'none'
-            : 'transform 0.15s ease-out',
-        }}
       >
-        {/* The gym map image */}
-        <img
-          src={MapImage}
-          alt="Gym map"
-          draggable={false}
-          style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
-        />
+        <svg
+          width="100%"
+          height="100%"
+          viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+          preserveAspectRatio="xMidYMid meet"
+          style={{
+            display: 'block',
+            width: '100%',
+            height: '100%',
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${zoom})`,
+            transformOrigin: 'center center',
+            transition: pointers.current && Object.keys(pointers.current).length > 0
+              ? 'none'
+              : 'transform 0.15s ease-out',
+          }}
+          onPointerDown={onPointerDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={onPointerUp}
+          onPointerCancel={onPointerUp}
+        >
+          <image
+            href={MapImage}
+            x="0"
+            y="0"
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+            preserveAspectRatio="xMidYMid meet"
+          />
 
-        {/* Fixed section labels (hard-coded positions) */}
-        {zoom <= LABEL_ZOOM_THRESHOLD && (
-          <>
-            {[
-              { key: 'frontslab', label: 'Front slab', x: 93, y: 50 },
-              { key: 'wave',      label: 'Wave wall', x: 70, y: 71 },
-              { key: 'accordion', label: 'Accordion wall', x: 35, y: 72 },
-              { key: 'bulge',     label: 'Bulge', x: 6,  y: 50 },
-              { key: 'roof',      label: 'Super roof', x: 60, y: 45 },
-              { key: 'staircase', label: 'Staircase wall', x: 30, y: 45 },
-              { key: 'backslab',  label: 'Back slab', x: 50, y: 21 },
-            ].map(s => (
-              <MapLabel
-                key={s.key}
-                label={s.label}
-                x={s.x}
-                y={s.y}
-                onClick={() => onSectionSelect(s.key)}
+          {zoom <= LABEL_ZOOM_THRESHOLD && UNIQUE_LABELS.map(s => (
+            <g
+              key={s.key}
+              transform={`translate(${(s.x / 100) * MAP_WIDTH} ${(s.y / 100) * MAP_HEIGHT})`}
+              onClick={(e) => { e.stopPropagation(); onSectionSelect(s.key); }}
+              style={{ cursor: 'pointer' }}
+            >
+              <rect
+                x={-240}
+                y={-42}
+                width={480}
+                height={68}
+                rx={34}
+                fill="rgba(13, 13, 13, 0.88)"
+                stroke="rgba(255,255,255,0.18)"
+                strokeWidth={2}
               />
-            ))}
-          </>
-        )}
+              <text
+                x={0}
+                y={0}
+                dominantBaseline="middle"
+                textAnchor="middle"
+                fontFamily="var(--font-display)"
+                fontSize={46}
+                fontWeight={800}
+                fill="#fff"
+              >
+                {s.label}
+              </text>
+            </g>
+          ))}
 
-        {/* Overlay: textual section labels OR individual pins */}
-        <div style={{ position: 'absolute', inset: 0 }}>
           {!showClusters && routes.map(route => (
             <RoutePin
               key={route.id}
@@ -360,12 +327,9 @@ export default function MapCanvas({ routes = [], onSectionSelect, onRouteSelect 
               onClick={onRouteSelect}
             />
           ))}
-        </div>
-      </div>
+        </svg>
 
-      {/* Controls */}
-      <div
-        style={{
+        <div style={{
           position: 'absolute',
           top: '0.75rem',
           right: '0.75rem',
@@ -373,39 +337,38 @@ export default function MapCanvas({ routes = [], onSectionSelect, onRouteSelect 
           flexDirection: 'column',
           gap: '0.4rem',
           zIndex: 50,
-        }}
-      >
-        {[
-          { label: '+', action: () => setZoom(z => clamp(z * 1.3, MIN_ZOOM, MAX_ZOOM)) },
-          { label: '−', action: () => setZoom(z => clamp(z / 1.3, MIN_ZOOM, MAX_ZOOM)) },
-          { label: '⊙', action: resetView },
-        ].map(({ label, action }) => (
-          <button
-            key={label}
-            onClick={action}
-            style={{
-              width: '36px',
-              height: '36px',
-              borderRadius: 'var(--radius-sm)',
-              background: 'rgba(13,13,13,0.8)',
-              border: '1px solid var(--border-2)',
-              color: 'var(--text)',
-              fontFamily: 'var(--font-display)',
-              fontWeight: 700,
-              fontSize: '1rem',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              backdropFilter: 'blur(8px)',
-              cursor: 'pointer',
-              WebkitTapHighlightColor: 'transparent',
-            }}
-            aria-label={label}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
+        }}>
+          {[
+            { label: '+', action: () => setZoom(z => clamp(z * 1.3, MIN_ZOOM, MAX_ZOOM)) },
+            { label: '−', action: () => setZoom(z => clamp(z / 1.3, MIN_ZOOM, MAX_ZOOM)) },
+            { label: '⊙', action: resetView },
+          ].map(({ label, action }) => (
+            <button
+              key={label}
+              onClick={action}
+              style={{
+                width: '36px',
+                height: '36px',
+                borderRadius: 'var(--radius-sm)',
+                background: 'rgba(13,13,13,0.8)',
+                border: '1px solid var(--border-2)',
+                color: 'var(--text)',
+                fontFamily: 'var(--font-display)',
+                fontWeight: 700,
+                fontSize: '1rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                backdropFilter: 'blur(8px)',
+                cursor: 'pointer',
+                WebkitTapHighlightColor: 'transparent',
+              }}
+              aria-label={label}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
       {/* Zoom hint */}
       {zoom < 1.2 && routes.some(r => r.pin_x != null) && (
