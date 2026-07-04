@@ -67,7 +67,7 @@ function RoutePin({ route, zoom, onClick }) {
   if (route.pin_x == null || route.pin_y == null) return null;
   const color = HOLD_COLORS[route.color?.toLowerCase()] ?? '#555';
   const outline = hexToRgba(color, 0.25);
-  const size = clamp(32 / zoom, 25, 30);
+  const size = clamp(32 / zoom, 35, 40);
   const x = (route.pin_x / 100) * MAP_WIDTH;
   const y = (route.pin_y / 100) * MAP_HEIGHT;
 
