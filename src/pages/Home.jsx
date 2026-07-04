@@ -257,13 +257,12 @@ function MiniPodium({ top3, navigate }) {
 function Hero({ login }) {
   return (
     <section style={{ padding: '2.5rem 0 2rem', textAlign: 'center' }}>
-      <p className="section-label" style={{ marginBottom: '0.75rem' }}>Your local gym, tracked</p>
       <h1 style={{ letterSpacing: '-0.03em', marginBottom: '1rem' }}>
         Log your sends.<br />
-        <span style={{ color: 'var(--accent)' }}>Own your progress.</span>
+        <span style={{ color: 'var(--accent)' }}>Type Shift.</span>
       </h1>
       <p className="text-muted text-sm" style={{ maxWidth: '320px', margin: '0 auto 1.75rem', lineHeight: 1.6 }}>
-        Track every route you've touched, clip your sends, and see what's fresh on the wall.
+        Track every route, clip your sends, and see what's new on the wall.
       </p>
       <button
         className="btn btn-primary btn-full"
