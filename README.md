@@ -40,6 +40,7 @@ an interactive gym map where users can explore routes, contribute climbing beta,
 
 ## Architecture
 
+<pre>
 React Frontend 
       │ 
       ▼ 
@@ -51,6 +52,7 @@ Supabase
       │ 
       ▼ 
 Vercel Deployment
+</pre>
 
 ## Screenshots
 <img width="1179" height="2556" alt="image" src="https://github.com/user-attachments/assets/5ee32476-f1e4-4911-b5ad-da0db89ee08e" />
