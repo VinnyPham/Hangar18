@@ -11,15 +11,19 @@ an interactive gym map where users can explore routes, contribute climbing beta,
 **Interactive Gym Map**: 
 - Browse climbing walls and routes through an intuitive visual interface.
 - Select routes to view detailed information and community content.
+  
 **Climb Logging**: 
 - Record completed climbs.
 - Track climbing history and progress over time.
+
 **Community Beta**: 
 - Upload and view beta videos for individual routes.
 - Share techniques and climbing sequences with other climbers.
+  
 **User Authentication**: 
 - Secure sign up and login using Supabase Authentication.
 - Personalized climbing history and uploaded content.
+
 **Cloud Storage**: 
 - Store beta videos and user-generated media using Supabase Storage.
 - Secure access with Row-Level Security (RLS).
